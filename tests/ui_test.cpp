@@ -5,6 +5,7 @@
 #include "imagepage.h"
 #include "previewsettings.h"
 #include "previewwindow.h"
+#include "shortcutsdialog.h"
 #include "sidebar.h"
 #include "testutil.h"
 #include "turnsaver.h"
@@ -16,6 +17,7 @@
 #include "ui/header_button.h"
 #include "ui/image_info.h"
 #include "ui/keys.h"
+#include "ui/scroll_view.h"
 #include "ui/test_input.h"
 #include "ui/theme.h"
 #include "ui/window.h"
@@ -25,6 +27,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <filesystem>
+#include <functional>
 #include <unistd.h>
 
 using namespace cutefish::ui;
@@ -597,4 +600,58 @@ TEST_F(UiTest, TheHeaderKeepsOneSpacing)
     for (const RectF& rect : {toggle, tools, previous})
         EXPECT_EQ(rect.y * 2 + rect.height, PreviewWindow::kHeaderHeight);
     EXPECT_EQ(position.y, title.y);
+}
+
+// The shortcuts list spans the dialog under its title, its bar at the
+// window's right edge, and takes the pointer to every edge.
+TEST_F(UiTest, ShortcutsScrollFromEveryEdge)
+{
+    Window parent;
+    parent.resize({800, 600});
+    parent.setContentView(std::make_unique<View>());
+    parent.show();
+    ShortcutsDialog shortcuts(&parent);
+    shortcuts.show();
+    Window* dialog = nullptr;
+    for (Window* window : cutefish::ui::Application::instance()->windows()) {
+        if (window->transientParent() == &parent && !window->isHidden())
+            dialog = window;
+    }
+    ASSERT_TRUE(dialog);
+    dialog->grab();
+    ScrollView* scroll = nullptr;
+    const std::function<void(View*)> collect = [&](View* view) {
+        if (auto* found = dynamic_cast<ScrollView*>(view))
+            scroll = found;
+        for (const auto& child : view->children())
+            collect(child.get());
+    };
+    collect(dialog->contentView());
+    ASSERT_TRUE(scroll);
+    const SizeF size = dialog->size();
+    EXPECT_EQ(size, (SizeF {480, 42 + 600 - 44}));
+    const PointF origin = scroll->mapToWindow({});
+    EXPECT_EQ((RectF {origin.x, origin.y, scroll->geometry().width, scroll->geometry().height}),
+              (RectF {0, 42, size.width, size.height - 42}));
+    ASSERT_GT(scroll->contentSize().height, scroll->geometry().height);
+
+    // A drag of the handle, which starts under the bar's top, at the edge.
+    const PointF grab {size.width - 4, 42 + 4};
+    TestInput::press(*dialog, grab);
+    TestInput::movePointer(*dialog, {grab.x, grab.y + 60});
+    TestInput::release(*dialog, {grab.x, grab.y + 60});
+    dialog->grab();
+    EXPECT_GT(scroll->scrollPosition().y, 0) << "the drag at the edge";
+
+    ScrollEvent wheel;
+    wheel.value120Y = 120;
+    wheel.deltaY = 10;
+    const double middle = 42 + (size.height - 42) / 2;
+    for (const PointF point : {PointF {size.width - 1, middle}, PointF {4, middle},
+                               PointF {size.width / 2, size.height - 4}}) {
+        scroll->setScrollPosition({0, 0});
+        TestInput::scroll(*dialog, point, wheel);
+        dialog->grab();
+        EXPECT_GT(scroll->scrollPosition().y, 0) << "the wheel at " << point.x << ", " << point.y;
+    }
 }

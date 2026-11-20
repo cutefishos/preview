@@ -144,15 +144,14 @@ public:
         scroll->setBottomCornerRadius(ui::Theme::current().windowRadius);
     }
 
-    double heightForWidth(double) const override { return 600 - 44 - 16; }
+    double heightForWidth(double) const override { return 600 - 44; }
 
     ui::ScrollView* scroll;
 
 protected:
     void layout() override
     {
-        // The scroll area spans the window under the title, past the dialog's padding.
-        scroll->setGeometry({-16, 0, geometry().width + 32, geometry().height + 16});
+        scroll->setGeometry(localRect());
     }
 };
 
@@ -215,6 +214,7 @@ void ShortcutsDialog::show()
     m_dialog->window()->setBackgroundColor(ui::ColorId::Background);
     ui::DialogWindow* dialog = m_dialog.get();
     m_dialog->window()->addShortcut(ui::NoModifier, ui::key::Escape, [dialog] { dialog->close(); });
+    m_dialog->setEdgeToEdge(true);
     auto* scroller = m_dialog->setContent<Scroller>();
     auto* column = scroller->scroll->setContent<Column>();
     for (const Section& section : sections) {
