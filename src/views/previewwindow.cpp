@@ -182,9 +182,7 @@ protected:
         };
         double x = kHeaderInset;
         if (windowButtons) {
-            const double spacing = ui::Theme::current().coloredWindowControls ? ui::window_controls::kColoredSpacing
-                                                                              : ui::window_controls::kSpacing;
-            x = m_header->leadingInset() - spacing + kGroupGap;
+            x = m_header->leadingInset() - ui::window_controls::kSpacing + kGroupGap;
         }
         place(sidebarGroup, snap(x), top);
         x = sidebarGroup->geometry().x + plateWidth(sidebarGroup) + kGroupGap;
