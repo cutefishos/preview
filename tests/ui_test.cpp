@@ -563,3 +563,38 @@ TEST_F(UiTest, TheImageHeaderAndRowsFollowTheSidebarsWidth)
     EXPECT_EQ(window.previousArrowGeometry().x, 285 + 9);
     EXPECT_EQ(window.sidebar()->rowGeometry(0).height, 180);
 }
+
+// Without the sidebar the header keeps one spacing: the window buttons'
+// inset of 9 at the end too, 12 between groups, 8 between "3 of 24" and the
+// name, the buttons centred on the header's line.
+TEST_F(UiTest, TheHeaderKeepsOneSpacing)
+{
+    std::vector<std::string> paths;
+    for (const char* name : {"1.png", "2.png"})
+        paths.push_back(writePng(directory.filePath(name), 40, 30));
+    application.open({paths[0]});
+    PreviewWindow& window = onlyWindow();
+    ASSERT_TRUE(showing(window, paths[0]));
+    ASSERT_TRUE(waitFor(loop(), [&] { return window.count() == 2; }));
+    TestInput::configure(window.window(), 1000, 700, {});
+    ASSERT_FALSE(window.sidebarShown());
+    window.window().grab();
+    const auto inWindow = [](const View* view) {
+        const PointF origin = view->mapToWindow({});
+        return RectF {origin.x, origin.y, view->geometry().width, view->geometry().height};
+    };
+    const RectF toggle = inWindow(window.sidebarButton()->parent());
+    const RectF tools = inWindow(window.zoomInButton()->parent());
+    const RectF previous = window.previousArrowGeometry();
+    const RectF position = window.positionGeometry();
+    const RectF title = window.titleGeometry();
+    // Close, minimize and maximize, 22 wide and 6 apart from 9.
+    EXPECT_EQ(toggle.x, 9 + 3 * 22 + 2 * 6 + 12);
+    EXPECT_EQ(previous.x, toggle.right() + 12);
+    EXPECT_EQ(position.x, previous.x + 2 * previous.width + 12);
+    EXPECT_EQ(title.x, position.right() + 8);
+    EXPECT_EQ(window.window().size().width - tools.right(), 9);
+    for (const RectF& rect : {toggle, tools, previous})
+        EXPECT_EQ(rect.y * 2 + rect.height, PreviewWindow::kHeaderHeight);
+    EXPECT_EQ(position.y, title.y);
+}

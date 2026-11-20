@@ -42,6 +42,7 @@
 #include "ui/theme.h"
 #include "ui/toast.h"
 #include "ui/window.h"
+#include "ui/window_controls.h"
 #include "ui/window_header.h"
 
 #include <algorithm>
@@ -59,17 +60,17 @@ using cutefish::i18n::tr;
 using cutefish::i18n::trc;
 using ui::rounding::centeredStart;
 
-static constexpr double kButtonSize = 32;
 static constexpr double kMinimumContentWidth = 480;
 static constexpr double kMinimumContentHeight = 360;
 // The terminal's default window shape, at nine tenths of its size.
 static constexpr ui::SizeF kWelcomeSize {684, 405};
 static constexpr double kZoomStep = 1.5;
-static constexpr double kSidebarGap = 9;
-// From the sidebar toggle to a title after it: room for text, which the
-// buttons' own plates do not give.
-static constexpr double kTitleGap = 12;
-static constexpr double kPageTextGap = 8;
+// The header's spacing: the window buttons' inset from the window's edge,
+// used at both ends and past the sidebar's edge; one gap between neighbouring
+// groups, text included; a smaller one between the texts of one run.
+static constexpr double kHeaderInset = 9;
+static constexpr double kGroupGap = 12;
+static constexpr double kTextGap = 8;
 // What the content keeps beside a shown sidebar at the window's minimum size,
 // as in Files: the sidebar grows only as the window does.
 static constexpr double kMinimumContentWidthBesideSidebar = kMinimumContentWidth - Sidebar::kDefaultWidth;
@@ -160,67 +161,79 @@ public:
     ui::HeaderButton* rotate;
     ui::HeaderButton* search;
     double sidebarWidth = 0;
+    // Off in full screen, where the window buttons hide.
+    bool windowButtons = true;
 
 protected:
     void layout() override
     {
         const double height = geometry().height;
+        const double scale = window() ? window()->scale() : 1;
+        // On whole device pixels, so equal gaps come out equal.
+        const auto snap = [scale](double value) { return std::round(value * scale) / scale; };
+        // A plate is drawn on whole device pixels, its width rounded down.
+        const auto plateWidth = [scale](const ui::HeaderButtonGroup* plate) {
+            return std::floor(plate->sizeHint().width * scale) / scale;
+        };
         const double top = centeredStart(height, ui::HeaderButtonGroup::kSegment);
-        // The plates keep the glyphs where the buttons' own plates had them.
-        const double plateInset = (kButtonSize - ui::HeaderButtonGroup::kSegment) / 2;
-        double x = m_header->leadingInset() + 4;
-        place(sidebarGroup, x + plateInset, top);
+        // The capitals centred on the buttons, as Settings' title is.
+        const auto textTop = [height, scale](const ui::Label* label) {
+            return std::round((height / 2 - label->capCenter()) * scale) / scale;
+        };
+        double x = kHeaderInset;
+        if (windowButtons) {
+            const double spacing = ui::Theme::current().coloredWindowControls ? ui::window_controls::kColoredSpacing
+                                                                              : ui::window_controls::kSpacing;
+            x = m_header->leadingInset() - spacing + kGroupGap;
+        }
+        place(sidebarGroup, snap(x), top);
+        x = sidebarGroup->geometry().x + plateWidth(sidebarGroup) + kGroupGap;
         // From the sidebar's edge as the Files header's buttons are.
-        x = std::max(sidebarGroup->geometry().right() + 4, sidebarWidth + kSidebarGap);
+        x = snap(std::max(x, sidebarWidth + kHeaderInset));
         if (arrows->isVisible()) {
             place(arrows, x, top);
-            x += arrows->geometry().width + 4 + 2 * plateInset;
+            x = snap(x + plateWidth(arrows) + kGroupGap);
         }
-        // Without the arrows, a PDF's page number where they would start.
         if (position->isVisible()) {
             const ui::SizeF hint = position->sizeHint();
             position->setColor(ui::ColorId::Text);
-            position->setGeometry({x, centeredStart(height, hint.height), hint.width, hint.height});
-            x += hint.width;
+            const double width = std::ceil(hint.width);
+            position->setGeometry({x, textTop(position), width, hint.height});
+            x = snap(x + width + kTextGap);
         }
-        double right = geometry().width - 4;
+        // The window shows only whole device pixels of a fractional width.
+        double right = (std::floor(geometry().width * scale) - std::round(kHeaderInset * scale)) / scale;
         // Rotate for an image, search for a PDF, in one place.
         if (tools->isVisible()) {
-            const double width = tools->sizeHint().width;
-            place(tools, right - plateInset - width, top);
-            right -= width + 2 * plateInset;
+            right = snap(right - plateWidth(tools));
+            place(tools, right, top);
+            right -= kGroupGap;
         }
         const ui::SizeF hint = title->sizeHint();
         title->setColor(ui::ColorId::Text);
         if (showsPage) {
             // In line with the page's left edge at fit.
             if (sidebarWidth > 0)
-                x = std::max(x, sidebarWidth + PdfView::kMargin);
-            else
-                x = sidebarGroup->geometry().right() + kTitleGap;
+                x = std::max(x, snap(sidebarWidth + PdfView::kMargin));
             // The page text stays whole while it fits; the name takes the rest.
-            const double available = std::max(0.0, right - 8 - x);
+            const double available = std::max(0.0, right - x);
             const ui::SizeF pageHint = page->sizeHint();
             const double pageWidth = std::ceil(pageHint.width);
             page->setVisible(pageWidth <= available);
-            const double nameWidth = page->isVisible() ? std::max(0.0, available - kPageTextGap - pageWidth)
+            const double nameWidth = page->isVisible() ? std::max(0.0, available - kTextGap - pageWidth)
                                                        : available;
-            const double y = centeredStart(height, hint.height);
+            const double y = textTop(title);
             title->setGeometry({x, y, std::min(nameWidth, std::ceil(hint.width)), hint.height});
             if (page->isVisible()) {
                 const std::optional<ui::Label::LineGeometry> line = title->lineGeometry(0);
                 const double nameEnd = x + std::ceil(line ? line->width : 0);
                 page->setColor(ui::ColorId::DisabledText);
-                page->setGeometry({nameEnd + kPageTextGap, y, pageWidth, pageHint.height});
+                page->setGeometry({nameEnd + kTextGap, y, pageWidth, pageHint.height});
             }
             return;
         }
         page->setVisible(false);
-        // A lone title after the toggle keeps the same room as a PDF's.
-        const double left = !previous->isVisible() && !position->isVisible() && sidebarWidth <= 0
-                ? sidebarGroup->geometry().right() + kTitleGap
-                : x + 8;
-        title->setGeometry({left, centeredStart(height, hint.height), std::max(0.0, right - 8 - left), hint.height});
+        title->setGeometry({x, textTop(title), std::max(0.0, right - x), hint.height});
     }
 
 private:
@@ -338,6 +351,7 @@ protected:
         bar->contentLeft = left;
         bar->setGeometry({0, 0, rect.width, kHeaderHeight});
         row->sidebarWidth = left;
+        row->windowButtons = !fullScreen;
         row->requestLayout();
         if (window())
             window()->setBackgroundBlur(rect, ui::Theme::current().windowRadius);

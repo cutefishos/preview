@@ -514,7 +514,7 @@ TEST_F(PdfUiTest, PagesRestBelowTheHeaderAndScrollUnderItsBackdrop)
     EXPECT_EQ(top * 2, std::round(top * 2));
 }
 
-// A PDF has no arrows; its name and page line start a little past where an image's first arrow does.
+// A PDF has no arrows; its name and page line start where an image's first arrow does.
 TEST_F(PdfUiTest, APdfHeaderHasNoArrows)
 {
     std::filesystem::create_directory(directory.filePath("images"));
@@ -536,9 +536,9 @@ TEST_F(PdfUiTest, APdfHeaderHasNoArrows)
     if (pdf.sidebarShown())
         pdf.toggleSidebar();
     pdf.window().grab();
-    // The name keeps room for text past the toggle, 8 further than an
-    // image's first arrow starts.
-    EXPECT_EQ(pdf.titleGeometry().x, arrow.x + 8);
+    // The name starts where an image's first arrow does, one group gap past
+    // the toggle.
+    EXPECT_EQ(pdf.titleGeometry().x, arrow.x);
     EXPECT_EQ(pdf.titleGeometry().x, std::round(pdf.titleGeometry().x));
 }
 
