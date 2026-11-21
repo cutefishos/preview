@@ -75,6 +75,8 @@ public:
     void zoomToFit();
     void zoomToActualSize();
     bool sidebarShown() const { return m_sidebarShown; }
+    // 0 to 1 as the sidebar slides in, the content making room for it.
+    double sidebarReveal() const { return m_sidebarReveal; }
     void toggleSidebar();
     bool isFullScreen() const;
     void toggleFullScreen();
@@ -145,6 +147,8 @@ private:
     // The full screen header: it fades out two seconds after the pointer stops.
     void poke();
     void updateChrome();
+    // The sidebar slides to where m_sidebarShown puts it, or is set there.
+    void updateSidebarReveal(bool animate);
     cutefish::ui::SizeF windowSizeFor(const cutefish::ui::ImageInfo& info) const;
     cutefish::ui::SizeF windowSizeForPage(cutefish::ui::SizeF page) const;
     cutefish::ui::SizeF viewportFor(const cutefish::ui::ImageInfo& info) const;
@@ -162,6 +166,10 @@ private:
     // recent files.
     std::set<std::string> m_opened;
     bool m_sidebarShown = false;
+    double m_sidebarReveal = 0;
+    double m_revealFrom = 0;
+    double m_revealTo = 0;
+    std::unique_ptr<cutefish::ui::Animation> m_revealAnimation;
     // Of every kind, as last dragged in any window.
     double m_sidebarWidth;
     // The window took its size from its file.

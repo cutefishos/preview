@@ -68,6 +68,15 @@ PreviewWindow::PreviewWindow(Application& application)
     m_root = root.get();
     m_window->setContentView(std::move(root));
 
+    m_revealAnimation = std::make_unique<ui::Animation>(m_window.get());
+    m_revealAnimation->setDuration(200ms);
+    m_revealAnimation->setEasing(ui::Animation::Easing::OutCubic);
+    m_revealAnimation->onUpdate = [this](double value) {
+        m_sidebarReveal = m_revealFrom + (m_revealTo - m_revealFrom) * value;
+        m_root->requestLayout();
+        m_root->requestPaint();
+    };
+
     ImagePage* page = m_root->image;
     page->viewportFor = [this](const ui::ImageInfo& info) { return viewportFor(info); };
     page->onShown = [this] { shown(); };
@@ -262,11 +271,13 @@ void PreviewWindow::show(const std::vector<std::string>& paths)
     if (m_kind == DocumentKind::Pdf) {
         // Until the document says how many pages it has.
         m_sidebarShown = false;
+        updateSidebarReveal(false);
         m_root->image->clear();
         m_root->sidebar->setItems({});
         m_root->pdf->load(m_sequence->currentPath());
     } else {
         m_sidebarShown = m_application.settings().sidebarShown(kind());
+        updateSidebarReveal(false);
         m_root->pdf->clear();
         m_root->sidebar->setItems(m_sequence->paths());
         m_root->image->load(m_sequence->currentPath());
@@ -360,6 +371,7 @@ void PreviewWindow::pdfStateChanged()
     if (ready) {
         m_root->sidebar->setDocument(document);
         m_sidebarShown = m_application.settings().sidebarShown(DocumentKind::Pdf, document->pageCount() > 1);
+        updateSidebarReveal(false);
         if (!m_sized) {
             m_sized = true;
             if (!isFullScreen() && !m_window->states().maximized)
@@ -561,9 +573,25 @@ void PreviewWindow::toggleSidebar()
         return;
     m_sidebarShown = !m_sidebarShown;
     m_application.settings().setSidebarShown(kind(), m_sidebarShown);
+    updateSidebarReveal(true);
+    updateHeader();
+}
+
+void PreviewWindow::updateSidebarReveal(bool animate)
+{
+    const double reveal = m_sidebarShown ? 1 : 0;
+    if (!animate || ui::Application::instance()->platform() == ui::Application::Platform::Headless) {
+        m_revealAnimation->stop();
+        m_revealTo = reveal;
+        m_sidebarReveal = reveal;
+    } else if (reveal != m_revealTo || !m_revealAnimation->isRunning()) {
+        m_revealFrom = m_sidebarReveal;
+        m_revealTo = reveal;
+        if (m_revealFrom != m_revealTo)
+            m_revealAnimation->start();
+    }
     m_root->requestLayout();
     m_root->requestPaint();
-    updateHeader();
 }
 
 bool PreviewWindow::isFullScreen() const

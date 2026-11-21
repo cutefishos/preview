@@ -92,6 +92,8 @@ public:
     // As wide as asked, within what leaves the content its width at the
     // window's minimum size.
     double sidebarWidth() const;
+    // Where the content starts: as much of the sidebar as has slid in.
+    double contentLeft() const;
 
     Sidebar* sidebar;
     ImagePage* image;

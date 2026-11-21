@@ -215,28 +215,32 @@ PreviewWindow::Root::Root(PreviewWindow& owner)
 
 double PreviewWindow::Root::sidebarWidth() const
 {
-    if (!sidebar->isVisible())
-        return 0;
     const double widest = std::max(Sidebar::kMinimumWidth,
                                    std::min(Sidebar::kMaximumWidth,
                                             geometry().width - kMinimumContentWidthBesideSidebar));
     return std::min(m_owner.m_sidebarWidth, widest);
 }
 
+double PreviewWindow::Root::contentLeft() const
+{
+    return sidebar->isVisible() ? sidebarWidth() * m_owner.m_sidebarReveal : 0;
+}
+
 void PreviewWindow::Root::layout()
 {
     const ui::RectF rect = localRect();
-    sidebar->setVisible(m_owner.m_sidebarShown && !m_owner.isWelcome());
+    sidebar->setVisible(m_owner.m_sidebarReveal > 0 && !m_owner.isWelcome());
     const bool pdfShown = !m_owner.isWelcome() && m_owner.kind() == DocumentKind::Pdf;
     image->setVisible(!m_owner.isWelcome() && !pdfShown);
     pdf->setVisible(pdfShown);
     welcome->setVisible(m_owner.isWelcome());
-    const double left = sidebarWidth();
+    const double sidebarWidth = this->sidebarWidth();
+    const double left = contentLeft();
     const bool fullScreen = m_owner.isFullScreen();
     // The content runs under the header and rests below it.
     const double inset = fullScreen ? 0 : kHeaderHeight;
-    sidebar->setGeometry({0, 0, left, rect.height});
-    divider->setVisible(left > 0);
+    sidebar->setGeometry({left - sidebarWidth, 0, sidebarWidth, rect.height});
+    divider->setVisible(sidebar->isVisible() && m_owner.m_sidebarReveal == 1);
     divider->setSidebarWidth(left);
     divider->setGeometry({left - ui::SidebarDivider::kWidth / 2, 0, ui::SidebarDivider::kWidth, rect.height});
     const double width = std::max(0.0, rect.width - left);
@@ -264,7 +268,7 @@ void PreviewWindow::Root::layout()
 
 void PreviewWindow::Root::paint(ui::Painter& painter)
 {
-    const double left = sidebarWidth();
+    const double left = contentLeft();
     const ui::RectF rect = localRect();
     painter.fillRect({left, 0, rect.width - left, rect.height},
                      m_owner.isFullScreen() ? ui::Color {0, 0, 0, 255} : ui::Theme::current().background);
