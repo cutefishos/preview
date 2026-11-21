@@ -48,6 +48,8 @@ add_library(preview-ui STATIC
     src/views/passworddialog.cpp
     src/views/pdfpage.cpp
     src/views/pdfview.cpp
+    src/views/previewmenus.cpp
+    src/views/previewroot.cpp
     src/views/previewwindow.cpp
     src/views/shortcutsdialog.cpp
     src/views/sidebar.cpp

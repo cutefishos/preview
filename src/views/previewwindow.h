@@ -40,6 +40,8 @@ class PreviewWindow
 {
 public:
     static constexpr double kHeaderHeight = 40;
+    static constexpr double kMinimumContentWidth = 480;
+    static constexpr double kMinimumContentHeight = 360;
 
     explicit PreviewWindow(Application& application);
     ~PreviewWindow();
