@@ -9,6 +9,7 @@
 #include "ui/clipboard.h"
 #include "ui/editable_text.h"
 #include "ui/painter.h"
+#include "ui/scroll_bar.h"
 #include "ui/theme.h"
 #include "ui/window.h"
 
@@ -450,7 +451,7 @@ void PdfView::setTopInset(double inset)
     if (inset == m_topInset)
         return;
     m_topInset = inset;
-    setVerticalBarPadding(inset, 0);
+    setVerticalBarPadding(inset + ui::ScrollBar::inset, ui::ScrollBar::inset);
     m_canvas->requestLayout();
     requestLayout();
 }
